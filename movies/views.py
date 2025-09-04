@@ -26,8 +26,9 @@ from .forms import (
     ProfileForm,  # New import
 )
 from .models import Movie, Review, UserProfile, Genre
-
-
+from django.http import HttpResponse
+def healthz(request):
+    return HttpResponse("OK", status=200)
 # =================== PUBLIC VIEWS ===================
 
 def home(request):
