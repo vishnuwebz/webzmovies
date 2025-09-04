@@ -3,7 +3,7 @@ from django.contrib.auth.models import User
 from django.core.validators import MinValueValidator, MaxValueValidator
 from django.db.models.signals import post_save
 from django.dispatch import receiver
-
+from cloudinary.models import CloudinaryField
 
 from django.db import models
 from django.contrib.auth.models import User
@@ -22,7 +22,7 @@ class Movie(models.Model):
     genre = models.ManyToManyField(Genre)
     release_date = models.DateField()
     synopsis = models.TextField()
-    poster = models.ImageField(upload_to='posters/')
+    poster = CloudinaryField("poster", folder="webzmovies/posters/")
     telegram_link = models.URLField()
     average_rating = models.FloatField(default=0)
     trailer_url = models.URLField(blank=True, null=True)  # NEW: Trailer addition - YouTube URL for the trailer
