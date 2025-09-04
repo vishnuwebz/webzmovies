@@ -1,0 +1,56 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="auth-section">
+    <div class="auth-container glass">
+        <div class="auth-header">
+            <h2>Play Online</h2>
+            <p>Paste any streamable video link (YouTube, Vimeo, Dailymotion, Twitch, Facebook, TikTok, Instagram, or direct video URL) to play it here.</p>
+            <p class="instruction-text">
+                How to copy a link:
+                - YouTube: Click 'Share' > 'Copy Link'.
+                - Instagram/TikTok: Use the share option (e.g., 'Copy Link') from the post.
+                - Ensure no extra apps modify the URL.
+            </p>
+            {% if error_message %}
+                <p class="error-message">{{ error_message }}</p>
+            {% endif %}
+        </div>
+
+        <form class="auth-form" method="POST">
+            {% csrf_token %}
+            <div class="form-group">
+                <label for="video_link">Video Link</label>
+                <input type="url" id="video_link" name="video_link" required placeholder="e.g., https://www.youtube.com/watch?v=VIDEO_ID">
+            </div>
+            <button type="submit" class="btn-auth">Play Video</button>
+        </form>
+
+        {% if embed_url %}
+        <div class="trailer-container glass">
+            <h2 class="section-title">Playing Video</h2>
+            {% if video_type == 'direct' %}
+            <video width="100%" height="400" controls autoplay>
+                <source src="{{ embed_url }}" type="video/mp4">
+                Your browser does not support the video tag.
+            </video>
+            {% else %}
+            {% if embed_url|slice:":5" == '<iframe' %}
+                {{ embed_url|safe }}
+            {% else %}
+                <iframe
+                    width="100%"
+                    height="400"
+                    src="{{ embed_url }}?autoplay=1&rel=0&modestbranding=1&controls=1&iv_load_policy=3&showinfo=0"
+                    frameborder="0"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allowfullscreen>
+                </iframe>
+            {% endif %}
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</section>
+{% endblock %}

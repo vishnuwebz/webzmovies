@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="profile-section">
+    <div class="profile-header glass">
+        {% if profile.avatar %}
+            <img src="{{ profile.avatar.url }}" alt="User Avatar" class="profile-avatar">
+        {% else %}
+            <img src="https://via.placeholder.com/120/1e293b/ffffff?text={{ user.username.0 }}" alt="User Avatar" class="profile-avatar">
+        {% endif %}
+        <div class="profile-info">
+            <h2>{{ user.username }}</h2>
+            <p>Movie Enthusiast | Member since {{ user.date_joined|date:"Y" }}</p>
+        </div>
+    </div>
+    
+    <div class="profile-content">
+        <div class="profile-sidebar glass">
+            <ul class="sidebar-menu">
+                <li><a href="{% url 'movies:profile' %}"><i class="fas fa-user"></i> Profile</a></li>
+                <li><a href="{% url 'movies:wishlist' %}"><i class="fas fa-heart"></i> Wishlist</a></li>
+                <li><a href="#"><i class="fas fa-history"></i> Watch History</a></li>
+                <li><a href="#"><i class="fas fa-star"></i> Reviews</a></li>
+                <li><a href="#"><i class="fas fa-download"></i> Downloads</a></li>
+                <li><a href="{% url 'movies:profile_settings' %}" class="active"><i class="fas fa-cog"></i> Settings</a></li>
+            </ul>
+        </div>
+        
+        <div class="profile-main">
+            <h3>Update Profile Photo</h3>
+            <form method="post" enctype="multipart/form-data" class="glass">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="id_avatar">Profile Photo</label>
+                    {{ form.avatar }}
+                    {{ form.avatar.errors }}
+                </div>
+                <button type="submit" class="btn btn-primary">Update</button>
+            </form>
+            
+            <h3>Delete Account</h3>
+            <div class="glass">
+                <p>Warning: This action is permanent and cannot be undone.</p>
+                <a href="{% url 'movies:delete_account' %}" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete your account permanently?');">Delete Account</a>
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

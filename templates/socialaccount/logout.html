@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<section class="auth-section">
+    <div class="auth-card glass">
+        <h1 class="auth-title">
+            <i class="fas fa-sign-out-alt"></i> Sign Out
+        </h1>
+        <p class="auth-subtitle">
+            Are you sure you want to log out from <strong>{{ user.username }}</strong>?
+        </p>
+
+        <form method="post" action="{% url 'account_logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="btn-auth btn-danger">
+                <i class="fas fa-power-off"></i> Yes, Log Me Out
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <a href="{% url 'movies:home' %}" class="link-back">
+                <i class="fas fa-arrow-left"></i> Cancel, Go Home
+            </a>
+        </div>
+    </div>
+</section>
+
+<style>
+/* Reuse auth styles for consistency */
+.auth-section {
+    padding: 7rem 1rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.auth-card {
+    max-width: 450px;
+    width: 100%;
+    padding: 2.5rem;
+    border-radius: 16px;
+    text-align: center;
+}
+
+.auth-title {
+    font-size: 2rem;
+    margin-bottom: 1rem;
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+.auth-subtitle {
+    margin-bottom: 1.5rem;
+    color: var(--text-muted);
+}
+
+.btn-auth {
+    width: 100%;
+    padding: 0.9rem;
+    background: var(--accent-gradient);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+}
+
+.btn-auth:hover {
+    transform: translateY(-2px);
+}
+
+.btn-danger {
+    background: linear-gradient(45deg, #ef4444, #dc2626);
+}
+
+.auth-footer {
+    margin-top: 1.5rem;
+}
+
+.auth-footer .link-back {
+    color: var(--text-muted);
+    font-size: 0.9rem;
+    text-decoration: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.3rem;
+    transition: color 0.2s ease;
+}
+
+.auth-footer .link-back:hover {
+    color: var(--accent);
+}
+</style>
+{% endblock %}

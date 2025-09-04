@@ -1,0 +1,28 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="admin-container">
+    {% include 'admin_sidebar.html' %}
+
+    <div class="admin-content" style="display:flex; justify-content:center; align-items:center; min-height:70vh;">
+        <div class="glass" style="padding:2rem; max-width:600px; width:100%; text-align:center; border-radius:12px;">
+            <h2>Confirm Delete {{ object_type }}</h2>
+            <p>Are you sure you want to delete: <strong>{{ object }}</strong>?</p>
+
+            <form method="post" style="margin-top:1.5rem; display:flex; gap:1rem; justify-content:center;">
+                {% csrf_token %}
+                <button class="btn btn-danger" type="submit">
+                    <i class="fas fa-trash"></i> Yes, Delete
+                </button>
+                <a class="btn btn-secondary" href="{% url cancel_url %}">
+                    <i class="fas fa-times"></i> Cancel
+                </a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block footer %}
+
+{% endblock %}

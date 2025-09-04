@@ -1,0 +1,1211 @@
+# movies/views.py
+from datetime import timedelta
+from functools import wraps
+
+from django import forms
+from django.contrib import messages
+from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.forms import AuthenticationForm
+from django.contrib.auth.models import User
+from django.core.paginator import Paginator
+from django.db.models import Q, Avg, Count
+from django.http import JsonResponse, HttpResponseForbidden
+from django.shortcuts import render, get_object_or_404, redirect
+from django.utils import timezone
+
+from .forms import (
+    ReviewForm,
+    CustomUserCreationForm,
+    AdminMovieForm,
+    AdminGenreForm,
+    AdminReviewForm,
+    AdminUserSearchForm,
+)
+from .models import Movie, Review, UserProfile, Genre
+
+
+# =================== PUBLIC VIEWS ===================
+
+def home(request):
+    movies = Movie.objects.all().order_by('-release_date')[:10]
+    return render(request, 'home.html', {'movies': movies})
+
+
+def movie_list(request):
+    movies = Movie.objects.all().order_by('-release_date')
+    genre_filter = request.GET.get('genre', '')
+    search_query = request.GET.get('search', '')
+    sort_by = request.GET.get('sort', 'newest')
+
+    if genre_filter:
+        movies = movies.filter(genre__name__icontains=genre_filter)
+    if search_query:
+        movies = movies.filter(
+            Q(title__icontains=search_query) |
+            Q(synopsis__icontains=search_query) |
+            Q(genre__name__icontains=search_query)
+        ).distinct()
+
+    if sort_by == 'rating':
+        movies = movies.order_by('-average_rating')
+    elif sort_by == 'title':
+        movies = movies.order_by('title')
+    elif sort_by == 'oldest':
+        movies = movies.order_by('release_date')
+    else:
+        movies = movies.order_by('-release_date')
+
+    all_genres = Genre.objects.all()
+    paginator = Paginator(movies, 12)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    return render(request, 'movie_list.html', {
+        'movies': page_obj,
+        'all_genres': all_genres,
+        'selected_genre': genre_filter,
+        'search_query': search_query,
+        'sort_by': sort_by,
+    })
+
+
+def movie_detail(request, movie_id):
+    movie = get_object_or_404(Movie, pk=movie_id)
+    reviews = Review.objects.filter(movie=movie).order_by('-created_at')
+    if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return redirect('login')
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            review = form.save(commit=False)
+            review.user = request.user
+            review.movie = movie
+            review.save()
+            return redirect('movie_detail', movie_id=movie.id)
+    else:
+        form = ReviewForm()
+    return render(request, 'movie_detail.html', {
+        'movie': movie,
+        'reviews': reviews,
+        'form': form,
+    })
+
+
+@login_required
+def wishlist(request):
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    movies = profile.wishlist.all()
+    return render(request, 'wishlist.html', {'wishlist_movies': movies})
+
+
+@login_required
+def add_to_wishlist(request, movie_id):
+    movie = get_object_or_404(Movie, pk=movie_id)
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+
+    if movie in profile.wishlist.all():
+        profile.wishlist.remove(movie)
+        added, message = False, f'Removed {movie.title} from your wishlist'
+    else:
+        profile.wishlist.add(movie)
+        added, message = True, f'Added {movie.title} to your wishlist'
+
+    is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    if is_ajax:
+        return JsonResponse({'added': added, 'message': message})
+    else:
+        messages.success(request, message)
+        return redirect(request.META.get('HTTP_REFERER', 'home'))
+
+
+@login_required
+def remove_from_wishlist(request, movie_id):
+    movie = get_object_or_404(Movie, pk=movie_id)
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+
+    if movie in profile.wishlist.all():
+        profile.wishlist.remove(movie)
+        message = f'Removed {movie.title} from your wishlist'
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        if is_ajax:
+            return JsonResponse({'success': True, 'message': message})
+        else:
+            messages.success(request, message)
+    return redirect('wishlist')
+
+
+def signup(request):
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, 'Account created successfully!')
+            return redirect('home')
+    else:
+        form = CustomUserCreationForm()
+    return render(request, 'signup.html', {'form': form})
+
+
+def login_view(request):
+    if request.method == 'POST':
+        form = AuthenticationForm(data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            messages.success(request, f'Welcome back, {user.username}!')
+            return redirect('home')
+    else:
+        form = AuthenticationForm()
+    return render(request, 'login.html', {'form': form})
+
+
+def logout_view(request):
+    logout(request)
+    messages.info(request, 'You have been logged out.')
+    return redirect('home')
+
+
+@login_required
+def profile(request):
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    reviews = Review.objects.filter(user=request.user).order_by('-created_at')
+    return render(request, 'profile.html', {'profile': profile, 'reviews': reviews})
+
+
+# =================== ADMIN HELPERS ===================
+
+def staff_required(view_func):
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return redirect("login")
+        if not (request.user.is_staff or request.user.is_superuser):
+            return HttpResponseForbidden("You do not have permission to access the admin dashboard.")
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
+
+# =================== ADMIN DASHBOARD ===================
+
+@staff_required
+def admin_dashboard(request):
+    stats = {
+        "movie_count": Movie.objects.count(),
+        "genre_count": Genre.objects.count(),
+        "review_count": Review.objects.count(),
+        "user_count": User.objects.count(),
+        "avg_rating": Review.objects.aggregate(avg=Avg("rating"))["avg"] or 0,
+    }
+    latest_reviews = Review.objects.select_related("movie", "user").order_by("-created_at")[:8]
+    top_movies = Movie.objects.annotate(rc=Count("review")).order_by("-rc", "-release_date")[:8]
+    return render(request, "admin_dashboard.html", {
+        "stats": stats,
+        "latest_reviews": latest_reviews,
+        "top_movies": top_movies,
+    })
+
+
+# =================== ADMIN MOVIES ===================
+
+@staff_required
+def admin_movies(request):
+    q = request.GET.get("q", "").strip()
+    genre_id = request.GET.get("genre")
+    movies = Movie.objects.all().prefetch_related("genre")
+
+    if q:
+        movies = movies.filter(Q(title__icontains=q) | Q(synopsis__icontains=q))
+    if genre_id:
+        movies = movies.filter(genre__id=genre_id)
+
+    movies = movies.order_by("-release_date", "title").distinct()
+    paginator = Paginator(movies, 12)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "admin_movies.html", {
+        "page_obj": page_obj,
+        "genres": Genre.objects.order_by("name"),
+        "q": q,
+        "genre_id": genre_id,
+    })
+
+
+@staff_required
+def admin_movie_add(request):
+    if request.method == "POST":
+        form = AdminMovieForm(request.POST, request.FILES)
+        if form.is_valid():
+            movie = form.save()
+            messages.success(request, f"Movie “{movie.title}” added.")
+            return redirect("movies:admin_movies")
+    else:
+        form = AdminMovieForm()
+    return render(request, "admin_add_movie.html", {"form": form, "genres": Genre.objects.all()})
+
+
+@staff_required
+def admin_movie_edit(request, pk):
+    movie = get_object_or_404(Movie, pk=pk)
+    if request.method == "POST":
+        form = AdminMovieForm(request.POST, request.FILES, instance=movie)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Movie “{movie.title}” updated.")
+            return redirect("movies:admin_movies")
+    else:
+        form = AdminMovieForm(instance=movie)
+    return render(request, "admin_edit_movie.html", {"form": form, "movie": movie})
+
+
+@staff_required
+def admin_movie_delete(request, pk):
+    movie = get_object_or_404(Movie, pk=pk)
+    if request.method == "POST":
+        title = movie.title
+        movie.delete()
+        messages.success(request, f"Movie “{title}” deleted.")
+        return redirect("movies:admin_movies")
+    return render(request, "admin_confirm_delete.html", {
+        "object": movie,
+        "object_type": "Movie",
+        "cancel_url": "movies:admin_movies",
+    })
+
+
+# =================== ADMIN GENRES ===================
+
+@staff_required
+def admin_genres(request):
+    genres = Genre.objects.order_by("name")
+    paginator = Paginator(genres, 30)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "admin_genres.html", {"page_obj": page_obj})
+
+
+@staff_required
+def admin_genre_add(request):
+    if request.method == "POST":
+        form = AdminGenreForm(request.POST)
+        if form.is_valid():
+            g = form.save()
+            messages.success(request, f"Genre “{g.name}” added.")
+            return redirect("movies:admin_genres")
+    else:
+        form = AdminGenreForm()
+    return render(request, "admin_add_genre.html", {"form": form})
+
+
+@staff_required
+def admin_genre_edit(request, pk):
+    genre = get_object_or_404(Genre, pk=pk)
+    if request.method == "POST":
+        form = AdminGenreForm(request.POST, instance=genre)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Genre “{genre.name}” updated.")
+            return redirect("movies:admin_genres")
+    else:
+        form = AdminGenreForm(instance=genre)
+    return render(request, "admin_edit_genre.html", {"form": form, "genre": genre})
+
+
+@staff_required
+def admin_genre_delete(request, pk):
+    genre = get_object_or_404(Genre, pk=pk)
+    if request.method == "POST":
+        name = genre.name
+        genre.delete()
+        messages.success(request, f"Genre “{name}” deleted.")
+        return redirect("movies:admin_genres")
+    return render(request, "admin_confirm_delete.html", {
+        "object": genre,
+        "object_type": "Genre",
+        "cancel_url": "movies:admin_genres",
+    })
+
+
+# =================== ADMIN REVIEWS ===================
+
+@staff_required
+def admin_reviews(request):
+    q = request.GET.get("q", "").strip()
+    reviews = Review.objects.select_related("movie", "user").order_by("-created_at")
+    if q:
+        reviews = reviews.filter(
+            Q(movie__title__icontains=q) |
+            Q(user__username__icontains=q) |
+            Q(comment__icontains=q)
+        )
+    paginator = Paginator(reviews, 20)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "admin_reviews.html", {"page_obj": page_obj, "q": q})
+
+
+@staff_required
+def admin_review_delete(request, pk):
+    review = get_object_or_404(Review, pk=pk)
+    if request.method == "POST":
+        review.delete()
+        messages.success(request, "Review deleted.")
+        return redirect("movies:admin_reviews")
+    return render(request, "admin_confirm_delete.html", {
+        "object": review,
+        "object_type": "Review",
+        "cancel_url": "movies:admin_reviews",
+    })
+
+
+# =================== ADMIN USERS ===================
+
+class AdminUserForm(forms.ModelForm):
+    password = forms.CharField(widget=forms.PasswordInput, required=False)
+
+    class Meta:
+        model = User
+        fields = ["username", "email", "password", "is_staff", "is_active"]
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        password = self.cleaned_data.get("password")
+        if password:
+            user.set_password(password)
+        if commit:
+            user.save()
+        return user
+
+
+@staff_required
+def admin_users(request):
+    form = AdminUserSearchForm(request.GET or None)
+    users = User.objects.all().order_by("-is_superuser", "-is_staff", "username")
+    if form.is_valid():
+        q = form.cleaned_data.get("q") or ""
+        if q:
+            users = users.filter(Q(username__icontains=q) | Q(email__icontains=q))
+    paginator = Paginator(users, 30)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    profiles = {p.user_id: p for p in UserProfile.objects.filter(user__in=[u.id for u in page_obj.object_list])}
+    return render(request, "admin_users.html", {
+        "page_obj": page_obj,
+        "profiles": profiles,
+        "form": form
+    })
+
+
+@staff_required
+def admin_user_add(request):
+    if request.method == "POST":
+        form = AdminUserForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "User created successfully!")
+            return redirect("movies:admin_users")
+    else:
+        form = AdminUserForm()
+    return render(request, "admin_add_user.html", {"form": form})
+
+
+@staff_required
+def admin_user_edit(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    if request.method == "POST":
+        form = AdminUserForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "User updated successfully!")
+            return redirect("movies:admin_users")
+    else:
+        form = AdminUserForm(instance=user)
+    return render(request, "admin_edit_user.html", {"form": form, "user": user})
+
+
+@staff_required
+def admin_user_delete(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    if request.method == "POST":
+        uname = user.username
+        user.delete()
+        messages.success(request, f"User “{uname}” deleted.")
+        return redirect("movies:admin_users")
+    return render(request, "admin_confirm_delete.html", {
+        "object": user,
+        "object_type": "User",
+        "cancel_url": "movies:admin_users",
+    })
+
+
+
+
+OLD VIEWS:
+
+
+
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib.auth import login, logout, authenticate
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.forms import AuthenticationForm
+from django.http import JsonResponse
+from .models import Movie, Review, UserProfile, Genre
+from .forms import ReviewForm, CustomUserCreationForm
+from django.contrib import messages
+from django.core.paginator import Paginator
+from django.db.models import Q
+from django.contrib.auth.models import User
+
+
+def home(request):
+    movies = Movie.objects.all().order_by('-release_date')[:10]
+
+    return render(request, 'home.html', {'movies': movies})
+
+
+def movie_list(request):
+    # Get all movies
+    movies = Movie.objects.all().order_by('-release_date')
+
+    # Get filter parameters from request
+    genre_filter = request.GET.get('genre', '')
+    search_query = request.GET.get('search', '')
+    sort_by = request.GET.get('sort', 'newest')
+
+    # Apply filters
+    if genre_filter:
+        movies = movies.filter(genre__name__icontains=genre_filter)
+
+    if search_query:
+        movies = movies.filter(
+            Q(title__icontains=search_query) |
+            Q(synopsis__icontains=search_query) |
+            Q(genre__name__icontains=search_query)
+        ).distinct()
+
+    # Apply sorting
+    if sort_by == 'rating':
+        movies = movies.order_by('-average_rating')
+    elif sort_by == 'title':
+        movies = movies.order_by('title')
+    elif sort_by == 'oldest':
+        movies = movies.order_by('release_date')
+    else:  # newest (default)
+        movies = movies.order_by('-release_date')
+
+    # Get all genres for filter dropdown
+    all_genres = Genre.objects.all()
+
+    # Add pagination (12 movies per page)
+    paginator = Paginator(movies, 12)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'movies': page_obj,  # Use page_obj for pagination
+        'all_genres': all_genres,
+        'selected_genre': genre_filter,
+        'search_query': search_query,
+        'sort_by': sort_by,
+    }
+
+    return render(request, 'movie_list.html', context)
+
+
+def movie_detail(request, movie_id):
+    movie = get_object_or_404(Movie, pk=movie_id)
+    reviews = Review.objects.filter(movie=movie).order_by('-created_at')
+    if request.method == 'POST':
+        if not request.user.is_authenticated:
+            return redirect('login')
+        form = ReviewForm(request.POST)
+        if form.is_valid():
+            review = form.save(commit=False)
+            review.user = request.user
+            review.movie = movie
+            review.save()
+            return redirect('movie_detail', movie_id=movie.id)
+    else:
+        form = ReviewForm()
+    return render(request, 'movie_detail.html', {'movie': movie, 'reviews': reviews, 'form': form})
+
+
+@login_required
+def wishlist(request):
+    try:
+        # Use get_or_create to handle any missing profiles
+        profile, created = UserProfile.objects.get_or_create(user=request.user)
+        movies = profile.wishlist.all()
+    except:
+        # If UserProfile table doesn't exist or other error
+        movies = []
+        messages.info(request, "Your wishlist is not available at the moment.")
+
+    return render(request, 'wishlist.html', {'wishlist_movies': movies})
+
+
+@login_required
+def add_to_wishlist(request, movie_id):
+    try:
+        movie = get_object_or_404(Movie, pk=movie_id)
+        # Use get_or_create to handle any missing profiles
+        profile, created = UserProfile.objects.get_or_create(user=request.user)
+
+        if movie in profile.wishlist.all():
+            profile.wishlist.remove(movie)
+            added = False
+            message = f'Removed {movie.title} from your wishlist'
+        else:
+            profile.wishlist.add(movie)
+            added = True
+            message = f'Added {movie.title} to your wishlist'
+
+        # Check if it's an AJAX request
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+        if is_ajax:
+            return JsonResponse({'added': added, 'message': message})
+        else:
+            if added:
+                messages.success(request, message)
+            else:
+                messages.info(request, message)
+            return redirect(request.META.get('HTTP_REFERER', 'home'))
+
+    except Exception as e:
+        # Handle the case where UserProfile table doesn't exist
+        if is_ajax:
+            return JsonResponse({'error': 'Wishlist functionality not available'}, status=500)
+        else:
+            messages.error(request, 'Wishlist functionality not available')
+            return redirect(request.META.get('HTTP_REFERER', 'home'))
+
+
+@login_required
+def remove_from_wishlist(request, movie_id):
+    movie = get_object_or_404(Movie, pk=movie_id)
+    # Use get_or_create to handle any missing profiles
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+
+    if movie in profile.wishlist.all():
+        profile.wishlist.remove(movie)
+        message = f'Removed {movie.title} from your wishlist'
+
+        # Check if it's an AJAX request
+        is_ajax = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+
+        if is_ajax:
+            return JsonResponse({'success': True, 'message': message})
+        else:
+            messages.success(request, message)
+
+    return redirect('wishlist')
+
+
+def signup(request):
+    if request.method == 'POST':
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+            login(request, user)
+            messages.success(request, 'Account created successfully!')
+            return redirect('home')
+    else:
+        form = CustomUserCreationForm()
+    return render(request, 'signup.html', {'form': form})
+
+
+def login_view(request):
+    if request.method == 'POST':
+        form = AuthenticationForm(data=request.POST)
+        if form.is_valid():
+            user = form.get_user()
+            login(request, user)
+            messages.success(request, f'Welcome back, {user.username}!')
+            return redirect('home')
+    else:
+        form = AuthenticationForm()
+    return render(request, 'login.html', {'form': form})
+
+
+def logout_view(request):
+    logout(request)
+    messages.info(request, 'You have been logged out.')
+    return redirect('home')
+
+
+@login_required
+def profile(request):
+    # Use get_or_create to handle any missing profiles
+    profile, created = UserProfile.objects.get_or_create(user=request.user)
+    reviews = Review.objects.filter(user=request.user).order_by('-created_at')
+    return render(request, 'profile.html', {'profile': profile, 'reviews': reviews})
+
+
+# Add these imports at the top
+from django.contrib.auth.models import User
+from django.db.models import Count, Q
+from django.utils import timezone
+from datetime import timedelta
+
+
+@login_required
+def admin_dashboard(request):
+    if not request.user.is_staff:
+        return redirect('home')
+
+    # Get counts for the dashboard
+    movies_count = Movie.objects.count()
+    users_count = User.objects.count()
+    reviews_count = Review.objects.count()
+
+    # Calculate downloads (you'll need to implement download tracking)
+    downloads_count = 2485  # Placeholder
+
+    # Get recent movies
+    recent_movies = Movie.objects.all().order_by('-id')[:10]
+
+    # Get recent users (last 7 days)
+    one_week_ago = timezone.now() - timedelta(days=7)
+    recent_users = User.objects.filter(date_joined__gte=one_week_ago).count()
+
+    # Get top rated movies
+    top_movies = Movie.objects.filter(average_rating__gt=0).order_by('-average_rating')[:5]
+
+    context = {
+        'movies_count': movies_count,
+        'users_count': users_count,
+        'downloads_count': downloads_count,
+        'reviews_count': reviews_count,
+        'recent_users': recent_users,
+        'movies': recent_movies,
+        'top_movies': top_movies,
+    }
+
+    return render(request, 'admin_dashboard.html', context)
+
+
+@login_required
+def admin_movies(request):
+    if not request.user.is_staff:
+        return redirect('home')
+
+    movies = Movie.objects.all().order_by('-release_date')
+
+    # Search functionality
+    search_query = request.GET.get('search', '')
+    if search_query:
+        movies = movies.filter(
+            Q(title__icontains=search_query) |
+            Q(synopsis__icontains=search_query) |
+            Q(genre__name__icontains=search_query)
+        ).distinct()
+
+    # Pagination
+    paginator = Paginator(movies, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'movies': page_obj,
+        'search_query': search_query,
+    }
+
+    return render(request, 'admin_movies.html', context)
+
+
+@login_required
+def admin_users(request):
+    if not request.user.is_staff:
+        return redirect('home')
+
+    users = User.objects.all().order_by('-date_joined')
+
+    # Search functionality
+    search_query = request.GET.get('search', '')
+    if search_query:
+        users = users.filter(
+            Q(username__icontains=search_query) |
+            Q(email__icontains=search_query) |
+            Q(first_name__icontains=search_query) |
+            Q(last_name__icontains=search_query)
+        )
+
+    # Get counts for stats
+    active_users_count = users.filter(is_active=True).count()
+    staff_users_count = users.filter(is_staff=True).count()
+
+    # Pagination
+    paginator = Paginator(users, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'users': page_obj,
+        'search_query': search_query,
+        'active_users_count': active_users_count,
+        'staff_users_count': staff_users_count,
+    }
+
+    return render(request, 'admin_users.html', context)
+
+
+@login_required
+def admin_reviews(request):
+    if not request.user.is_staff:
+        return redirect('home')
+
+    reviews = Review.objects.all().order_by('-created_at')
+
+    # Filter by rating
+    rating_filter = request.GET.get('rating', '')
+    if rating_filter:
+        reviews = reviews.filter(rating=rating_filter)
+
+    # Search functionality
+    search_query = request.GET.get('search', '')
+    if search_query:
+        reviews = reviews.filter(
+            Q(user__username__icontains=search_query) |
+            Q(movie__title__icontains=search_query) |
+            Q(comment__icontains=search_query)
+        )
+
+    # Get stats
+    total_reviews = reviews.count()
+    five_star_reviews = Review.objects.filter(rating=5).count()
+    average_rating = Review.objects.aggregate(avg_rating=Avg('rating'))['avg_rating'] or 0
+
+    # Pagination
+    paginator = Paginator(reviews, 20)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+
+    context = {
+        'reviews': page_obj,
+        'search_query': search_query,
+        'total_reviews': total_reviews,
+        'five_star_reviews': five_star_reviews,
+        'average_rating': average_rating,
+    }
+
+    return render(request, 'admin_reviews.html', context)
+
+
+@login_required
+def add_movie(request):
+    if not request.user.is_staff:
+        return redirect('home')
+
+    if request.method == 'POST':
+        # Handle movie creation form
+        title = request.POST.get('title')
+        release_date = request.POST.get('release_date')
+        synopsis = request.POST.get('synopsis')
+        telegram_link = request.POST.get('telegram_link')
+
+        # Create movie
+        movie = Movie.objects.create(
+            title=title,
+            release_date=release_date,
+            synopsis=synopsis,
+            telegram_link=telegram_link,
+            average_rating=0
+        )
+
+        # Handle genres
+        genre_ids = request.POST.getlist('genres')
+        if genre_ids:
+            movie.genre.set(genre_ids)
+
+        # Handle poster upload
+        if 'poster' in request.FILES:
+            movie.poster = request.FILES['poster']
+            movie.save()
+
+        messages.success(request, f'Movie "{title}" added successfully!')
+        return redirect('admin_movies')
+
+    genres = Genre.objects.all()
+    context = {
+        'genres': genres,
+    }
+    return render(request, 'admin_add_movie.html', context)
+
+
+@login_required
+def edit_movie(request, movie_id):
+    if not request.user.is_staff:
+        return redirect('home')
+
+    movie = get_object_or_404(Movie, pk=movie_id)
+
+    if request.method == 'POST':
+        # Handle movie update form
+        movie.title = request.POST.get('title')
+        movie.release_date = request.POST.get('release_date')
+        movie.synopsis = request.POST.get('synopsis')
+        movie.telegram_link = request.POST.get('telegram_link')
+
+        # Handle genres
+        genre_ids = request.POST.getlist('genres')
+        if genre_ids:
+            movie.genre.set(genre_ids)
+
+        # Handle poster upload
+        if 'poster' in request.FILES:
+            movie.poster = request.FILES['poster']
+
+        movie.save()
+        messages.success(request, f'Movie "{movie.title}" updated successfully!')
+        return redirect('admin_movies')
+
+    genres = Genre.objects.all()
+    context = {
+        'movie': movie,
+        'genres': genres,
+    }
+    return render(request, 'admin_edit_movie.html', context)
+
+
+@login_required
+def delete_movie(request, movie_id):
+    if not request.user.is_staff:
+        return redirect('home')
+
+    movie = get_object_or_404(Movie, pk=movie_id)
+
+    if request.method == 'POST':
+        title = movie.title
+        movie.delete()
+        messages.success(request, f'Movie "{title}" deleted successfully!')
+        return redirect('admin_movies')
+
+    context = {
+        'movie': movie,
+    }
+    return render(request, 'admin_delete_movie.html', context)
+
+
+
+# movies/views.py (append this section)
+from functools import wraps
+from django.contrib import messages
+from django.contrib.auth.models import User
+from django.core.paginator import Paginator
+from django.db.models import Q, Avg, Count
+from django.http import HttpResponseForbidden
+from django.shortcuts import get_object_or_404, redirect, render
+
+from .forms import (
+    AdminMovieForm, AdminGenreForm, AdminReviewForm, AdminUserSearchForm
+)
+from .models import Movie, Genre, Review, UserProfile
+
+# --- simple staff-only decorator that uses your site login ---
+def staff_required(view_func):
+    @wraps(view_func)
+    def _wrapped(request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            from django.shortcuts import redirect
+            return redirect("login")  # change if your login url name differs
+        if not (request.user.is_staff or request.user.is_superuser):
+            return HttpResponseForbidden("You do not have permission to access the admin dashboard.")
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
+# ============== DASHBOARD =================
+@staff_required
+def admin_dashboard(request):
+    stats = {
+        "movie_count": Movie.objects.count(),
+        "genre_count": Genre.objects.count(),
+        "review_count": Review.objects.count(),
+        "user_count": User.objects.count(),
+        "avg_rating": Review.objects.aggregate(avg=Avg("rating"))["avg"] or 0,
+    }
+    latest_reviews = (
+        Review.objects.select_related("movie", "user")
+        .order_by("-created_at")[:8]
+    )
+    top_movies = (
+        Movie.objects.annotate(rc=Count("review"))
+        .order_by("-rc", "-release_date")[:8]
+    )
+    return render(request, "admin_dashboard.html", {
+        "stats": stats,
+        "latest_reviews": latest_reviews,
+        "top_movies": top_movies,
+    })
+
+# ============== MOVIES ====================
+@staff_required
+def admin_movies(request):
+    q = request.GET.get("q", "").strip()
+    genre_id = request.GET.get("genre")
+    movies = Movie.objects.all().select_related().prefetch_related("genre")
+
+    if q:
+        movies = movies.filter(Q(title__icontains=q) | Q(synopsis__icontains=q))
+    if genre_id:
+        movies = movies.filter(genre__id=genre_id)
+
+    movies = movies.order_by("-release_date", "title").distinct()
+    paginator = Paginator(movies, 12)
+    page_obj = paginator.get_page(request.GET.get("page"))
+
+    return render(request, "admin_movies.html", {
+        "page_obj": page_obj,
+        "genres": Genre.objects.order_by("name"),
+        "q": q,
+        "genre_id": genre_id,
+    })
+
+@staff_required
+def admin_movie_add(request):
+    if request.method == "POST":
+        form = AdminMovieForm(request.POST, request.FILES)
+        if form.is_valid():
+            movie = form.save()
+            messages.success(request, f"Movie “{movie.title}” added.")
+            return redirect("movies:admin_movies")
+    else:
+        form = AdminMovieForm()
+    return render(request, "admin_add_movie.html", {"form": form, "genres": Genre.objects.all()})
+
+@staff_required
+def admin_movie_edit(request, pk):
+    movie = get_object_or_404(Movie, pk=pk)
+    if request.method == "POST":
+        form = AdminMovieForm(request.POST, request.FILES, instance=movie)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Movie “{movie.title}” updated.")
+            return redirect("movies:admin_movies")
+    else:
+        form = AdminMovieForm(instance=movie)
+    return render(request, "admin_edit_movie.html", {"form": form, "movie": movie})
+
+@staff_required
+def admin_movie_delete(request, pk):
+    movie = get_object_or_404(Movie, pk=pk)
+    if request.method == "POST":
+        title = movie.title
+        movie.delete()
+        messages.success(request, f"Movie “{title}” deleted.")
+        return redirect("movies:admin_movies")
+    return render(request, "admin_confirm_delete.html", {
+        "object": movie,
+        "object_type": "Movie",
+        "cancel_url": "movies:admin_movies",
+    })
+
+# ============== GENRES ====================
+@staff_required
+def admin_genres(request):
+    genres = Genre.objects.order_by("name")
+    paginator = Paginator(genres, 30)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "admin_genres.html", {"page_obj": page_obj})
+
+@staff_required
+def admin_genre_add(request):
+    if request.method == "POST":
+        form = AdminGenreForm(request.POST)
+        if form.is_valid():
+            g = form.save()
+            messages.success(request, f"Genre “{g.name}” added.")
+            return redirect("movies:admin_genres")
+    else:
+        form = AdminGenreForm()
+    return render(request, "admin_add_genre.html", {"form": form})
+
+@staff_required
+def admin_genre_edit(request, pk):
+    genre = get_object_or_404(Genre, pk=pk)
+    if request.method == "POST":
+        form = AdminGenreForm(request.POST, instance=genre)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Genre “{genre.name}” updated.")
+            return redirect("movies:admin_genres")
+    else:
+        form = AdminGenreForm(instance=genre)
+    return render(request, "admin_edit_genre.html", {"form": form, "genre": genre})
+
+@staff_required
+def admin_genre_delete(request, pk):
+    genre = get_object_or_404(Genre, pk=pk)
+    if request.method == "POST":
+        name = genre.name
+        genre.delete()
+        messages.success(request, f"Genre “{name}” deleted.")
+        return redirect("movies:admin_genres")
+    return render(request, "admin_confirm_delete.html", {
+        "object": genre,
+        "object_type": "Genre",
+        "cancel_url": "movies:admin_genres",
+    })
+
+# ============== REVIEWS ===================
+@staff_required
+def admin_reviews(request):
+    q = request.GET.get("q", "").strip()
+    reviews = Review.objects.select_related("movie", "user").order_by("-created_at")
+    if q:
+        reviews = reviews.filter(
+            Q(movie__title__icontains=q) | Q(user__username__icontains=q) | Q(comment__icontains=q)
+        )
+    paginator = Paginator(reviews, 20)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    return render(request, "admin_reviews.html", {"page_obj": page_obj, "q": q})
+
+@staff_required
+def admin_review_delete(request, pk):
+    review = get_object_or_404(Review, pk=pk)
+    if request.method == "POST":
+        review.delete()
+        messages.success(request, "Review deleted.")
+        return redirect("movies:admin_reviews")
+    return render(request, "admin_confirm_delete.html", {
+        "object": review,
+        "object_type": "Review",
+        "cancel_url": "movies:admin_reviews",
+    })
+
+# ============== USERS =====================
+@staff_required
+def admin_users(request):
+    form = AdminUserSearchForm(request.GET or None)
+    users = User.objects.all().order_by("-is_superuser", "-is_staff", "username")
+    if form.is_valid():
+        q = form.cleaned_data.get("q") or ""
+        if q:
+            users = users.filter(Q(username__icontains=q) | Q(email__icontains=q))
+    paginator = Paginator(users, 30)
+    page_obj = paginator.get_page(request.GET.get("page"))
+    # Join with profile (lazy-safe):
+    profiles = {p.user_id: p for p in UserProfile.objects.filter(user__in=[u.id for u in page_obj.object_list])}
+    return render(request, "admin_users.html", {"page_obj": page_obj, "profiles": profiles, "form": form})
+
+@staff_required
+def admin_user_delete(request, user_id):
+    user = get_object_or_404(User, pk=user_id)
+    if request.method == "POST":
+        uname = user.username
+        user.delete()
+        messages.success(request, f"User “{uname}” deleted.")
+        return redirect("movies:admin_users")
+    return render(request, "admin_confirm_delete.html", {
+        "object": user,
+        "object_type": "User",
+        "cancel_url": "movies:admin_users",
+    })
+
+
+from django.shortcuts import render, redirect
+from django.contrib.auth import login
+from .forms import CustomUserCreationForm
+
+
+def register_view(request):
+    if request.method == "POST":
+        form = CustomUserCreationForm(request.POST)
+        if form.is_valid():
+            user = form.save()
+
+            # Optional: handle newsletter checkbox
+            if form.cleaned_data.get("newsletter"):
+                # Save newsletter subscription logic
+                pass
+
+            login(request, user)
+            return redirect("profile")  # redirect after signup
+    else:
+        form = CustomUserCreationForm()
+    return render(request, "signup.html", {"form": form})
+
+
+
+from django.contrib.auth.models import User
+from django.contrib import messages
+from django.contrib.auth.decorators import user_passes_test
+from django.shortcuts import render, redirect, get_object_or_404
+from django.core.paginator import Paginator
+from django import forms
+
+# --- Forms ---
+class AdminUserForm(forms.ModelForm):
+    password = forms.CharField(widget=forms.PasswordInput, required=False)
+
+    class Meta:
+        model = User
+        fields = ["username", "email", "password", "is_staff", "is_active"]
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        password = self.cleaned_data.get("password")
+        if password:
+            user.set_password(password)
+        if commit:
+            user.save()
+        return user
+
+# --- Permission check ---
+def staff_required(view_func):
+    return user_passes_test(lambda u: u.is_staff, login_url="accounts:login")(view_func)
+
+# --- Views ---
+@staff_required
+def admin_users(request):
+    search_query = request.GET.get("search", "")
+    users = User.objects.all().order_by("-date_joined")
+    if search_query:
+        users = users.filter(username__icontains=search_query)
+
+    paginator = Paginator(users, 10)
+    page_number = request.GET.get("page")
+    users_page = paginator.get_page(page_number)
+
+    return render(request, "admin_users.html", {"users": users_page, "search_query": search_query})
+
+
+@staff_required
+def admin_user_add(request):
+    if request.method == "POST":
+        form = AdminUserForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "User created successfully!")
+            return redirect("movies:admin_users")
+    else:
+        form = AdminUserForm()
+    return render(request, "admin_add_user.html", {"form": form})
+
+
+@staff_required
+def admin_user_edit(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    if request.method == "POST":
+        form = AdminUserForm(request.POST, instance=user)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "User updated successfully!")
+            return redirect("movies:admin_users")
+    else:
+        form = AdminUserForm(instance=user)
+    return render(request, "admin_edit_user.html", {"form": form, "user": user})
+
+
+@staff_required
+def admin_user_delete(request, user_id):
+    user = get_object_or_404(User, id=user_id)
+    if request.method == "POST":
+        user.delete()
+        messages.success(request, "User deleted successfully!")
+        return redirect("movies:admin_users")
+    return render(request, "admin_confirm_delete.html", {
+        "object": user,
+        "object_type": "User",
+        "cancel_url": "movies:admin_users",
+    })
+
+

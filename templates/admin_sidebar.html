@@ -1,0 +1,186 @@
+{% load static %}
+
+<div class="admin-sidebar glass">
+    <div class="admin-brand">
+        <h2><span>WEBZ</span>ADMIN</h2>
+    </div>
+
+    <ul class="admin-menu">
+        <li><a href="{% url 'movies:admin_dashboard' %}" class="active"><i class="fas fa-home"></i> Dashboard</a></li>
+        <li><a href="{% url 'movies:admin_movies' %}"><i class="fas fa-film"></i> Movies</a></li>
+        <li><a href="{% url 'movies:admin_reviews' %}"><i class="fas fa-star"></i> Reviews</a></li>
+        <li><a href="{% url 'movies:admin_users' %}"><i class="fas fa-users"></i> Users</a></li>
+        <li><a href="{% url 'movies:admin_genres' %}"><i class="fas fa-tags"></i> Genres</a></li>
+        <li><a href="#"><i class="fas fa-download"></i> Downloads</a></li>
+        <li><a href="#"><i class="fas fa-chart-bar"></i> Analytics</a></li>
+        <li><a href="#"><i class="fas fa-cog"></i> Settings</a></li>
+    </ul>
+</div>
+
+<style>
+    /* admin_sidebar.css */
+    .admin-sidebar {
+        width: 250px;
+        background: var(--secondary);
+        padding: 2rem 0;
+        position: fixed;
+        top: 90px;
+        bottom: 190px;
+        left: 0;
+        height: calc(100vh - 70px);
+        overflow-y: auto;
+        z-index: 1000;
+        transition: var(--transition);
+    }
+
+    .admin-sidebar.glass {
+        background: var(--glass);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-right: 1px solid var(--glass-border);
+        box-shadow: var(--shadow);
+        border-radius: 0 16px 16px 0;
+    }
+
+    .admin-brand {
+        padding: 0 1.5rem;
+        margin-bottom: 2rem;
+    }
+
+    .admin-brand h2 {
+        font-family: 'Montserrat', sans-serif;
+        font-size: 1.8rem;
+        font-weight: 800;
+        color: var(--text);
+        text-align: center;
+    }
+
+    .admin-brand span {
+        color: var(--accent);
+        margin-right: 4px;
+    }
+
+    .admin-menu {
+        list-style: none;
+        padding: 0 1rem;
+    }
+
+    .admin-menu li {
+        margin-bottom: 0.5rem;
+    }
+
+    .admin-menu a {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        padding: 0.8rem 1rem;
+        color: var(--text-muted);
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: var(--transition);
+    }
+
+    .admin-menu a i {
+        font-size: 1.1rem;
+        width: 20px;
+        text-align: center;
+    }
+
+    .admin-menu a:hover {
+        background: var(--glass-hover);
+        color: var(--accent);
+    }
+
+    .admin-menu a.active {
+        background: var(--glass-hover);
+        color: var(--accent);
+        font-weight: 600;
+        position: relative;
+    }
+
+    .admin-menu a.active:after {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        height: 100%;
+        width: 4px;
+        background: var(--accent-gradient);
+        border-radius: 0 4px 4px 0;
+    }
+
+    @media (max-width: 1200px) {
+        .admin-sidebar {
+            width: 200px;
+        }
+
+        .admin-menu a {
+            padding: 0.6rem 0.8rem;
+            font-size: 0.9rem;
+        }
+
+        .admin-menu a i {
+            font-size: 1rem;
+        }
+    }
+
+    @media (max-width: 768px) {
+        .admin-sidebar {
+            width: 60px;
+            padding: 1rem 0;
+        }
+
+        .admin-brand h2 {
+            font-size: 1.2rem;
+            white-space: nowrap;
+        }
+
+        .admin-menu a {
+            justify-content: center;
+            padding: 0.6rem;
+        }
+
+        .admin-menu a span {
+            display: none;
+        }
+
+        .admin-menu a i {
+            margin: 0;
+        }
+
+        .admin-menu a.active:after {
+            width: 100%;
+            height: 4px;
+            top: auto;
+            bottom: 0;
+            border-radius: 0 0 4px 4px;
+        }
+    }
+
+    @media (max-width: 576px) {
+        .admin-sidebar {
+            width: 50px;
+        }
+
+        .admin-brand h2 {
+            font-size: 1rem;
+        }
+    }
+</style>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const currentUrl = window.location.pathname;
+        const menuItems = document.querySelectorAll('.admin-menu a');
+
+        menuItems.forEach(item => {
+            if (item.getAttribute('href') === currentUrl || 
+                (currentUrl.startsWith(item.getAttribute('href')) && item.getAttribute('href') !== '#')) {
+                item.classList.add('active');
+            } else {
+                item.classList.remove('active');
+            }
+        });
+    });
+</script>

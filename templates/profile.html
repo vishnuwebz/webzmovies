@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="profile-section">
+
+    <div class="profile-header glass">
+        {% if profile.avatar %}
+            <img src="{{ profile.avatar.url }}" alt="User Avatar" class="profile-avatar">
+        {% else %}
+            <img src="https://via.placeholder.com/120/1e293b/ffffff?text={{ user.username.0 }}" alt="User Avatar" class="profile-avatar">
+        {% endif %}
+        <div class="profile-info">
+            <h2>{{ user.username }}</h2>
+            <p>Movie Enthusiast | Member since {{ user.date_joined|date:"Y" }}</p>
+            <div class="profile-stats">
+                <div class="stat">
+                    <div class="stat-value">{{ reviews.count }}</div>
+                    <div class="stat-label">Reviews</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ profile.wishlist.count }}</div>
+                    <div class="stat-label">Wishlist</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">{{ avg_rating|floatformat:1 }}</div>
+                    <div class="stat-label">Avg Rating</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="profile-content">
+        <div class="profile-sidebar glass">
+            <ul class="sidebar-menu">
+                <li><a href="{% url 'movies:profile' %}" class="active"><i class="fas fa-user"></i> Profile</a></li>
+                <li><a href="{% url 'movies:wishlist' %}"><i class="fas fa-heart"></i> Wishlist</a></li>
+                <li><a href="#"><i class="fas fa-history"></i> Watch History</a></li>
+                <li><a href="#"><i class="fas fa-star"></i> Reviews</a></li>
+                <li><a href="#"><i class="fas fa-download"></i> Downloads</a></li>
+                <li><a href="{% url 'movies:profile_settings' %}"><i class="fas fa-cog"></i> Settings</a></li>
+            </ul>
+        </div>
+
+        <div class="profile-main">
+            <h3>Your Reviews</h3>
+            <div class="reviews-list">
+                {% for review in reviews %}
+                <div class="review-card glass">
+                    <div class="review-header">
+                        <div class="reviewer">
+                            {% if review.user.userprofile.avatar %}
+                                <img src="{{ review.user.userprofile.avatar.url }}" alt="User Avatar" class="reviewer-avatar">
+                            {% else %}
+                                <img src="https://via.placeholder.com/40/1e293b/ffffff?text={{ review.user.username.0 }}" alt="User Avatar" class="reviewer-avatar">
+                            {% endif %}
+                            <span class="reviewer-name">{{ review.user.username }}</span>
+                        </div>
+                        <div class="review-rating">
+                            {% for i in "12345" %}
+                                {% if forloop.counter <= review.rating %}
+                                    <i class="fas fa-star"></i>
+                                {% else %}
+                                    <i class="far fa-star"></i>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </div>
+                    <p class="review-comment">{{ review.comment }}</p>
+                    <div class="review-footer">
+                        <span class="review-date">{{ review.created_at|date:"M d, Y" }}</span>
+                        <a href="{% url 'movies:movie_detail' review.movie.id %}" class="movie-link">{{ review.movie.title }}</a>
+                    </div>
+                </div>
+                {% empty %}
+                <div class="no-reviews glass">
+                    <p>You haven't written any reviews yet.</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</section>
+{% endblock %}

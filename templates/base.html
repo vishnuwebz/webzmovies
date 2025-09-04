@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+{% load static %}
+
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WEBZMOVIES - Ultimate Movie Experience</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <meta name="csrf-token" content="{{ csrf_token }}">
+</head>
+<body>
+    <!-- Header & Navigation -->
+    <header class="glass">
+        <a href="{% url 'movies:home' %}" class="logo"><span>WEBZ</span>MOVIES</a>
+
+        <div class="hamburger">
+            <i class="fas fa-bars"></i>
+        </div>
+
+        <ul class="nav-links">
+            <li><a href="{% url 'movies:home' %}">Home</a></li>
+            <li><a href="{% url 'movies:movie_list' %}">Movies</a></li>
+            {% if user.is_authenticated %}
+                <li><a href="{% url 'movies:wishlist' %}">Wishlist</a></li>
+<!--                <li><a href="{% url 'movies:play_online' %}">Play Online</a></li>-->
+                <li><a href="{% url 'movies:profile' %}">{{ user.username }}</a></li>
+                <li><a href="{% url 'movies:logout' %}">Logout</a></li>
+                {% if user.is_staff %}
+                    <li><a href="{% url 'movies:admin_dashboard' %}">Admin</a></li>
+                {% endif %}
+            {% else %}
+                <li><a href="{% url 'movies:login' %}">Login</a></li>
+                <li><a href="{% url 'movies:signup' %}">Sign Up</a></li>
+            {% endif %}
+        </ul>
+    </header>
+
+    <!-- Django Messages -->
+    {% if messages %}
+    <div class="messages-container">
+        {% for message in messages %}
+        <div class="alert alert-{{ message.tags }} glass">
+            {{ message }}
+            <button type="button" class="close" data-dismiss="alert">&times;</button>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Main Content -->
+    <main>
+        {% block content %}
+        {% endblock %}
+    </main>
+
+    <!-- Footer -->
+    {% block footer %}
+    <footer>
+        <div class="footer-content">
+            <div class="footer-brand">
+                <h3><span>WEBZ</span>MOVIES</h3>
+                <p>The ultimate destination for movie enthusiasts to discover, review, and download their favorite films.</p>
+            </div>
+
+            <div class="footer-links">
+                <h4>Quick Links</h4>
+                <ul>
+                    <li><a href="{% url 'movies:home' %}">Home</a></li>
+                    <li><a href="{% url 'movies:movie_list' %}">Movies</a></li>
+                    <li><a href="#">New Releases</a></li>
+                    <li><a href="#">Trending</a></li>
+                    <li><a href="#">Support</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-links">
+                <h4>Genres</h4>
+                <ul>
+                    <li><a href="#">Action</a></li>
+                    <li><a href="#">Comedy</a></li>
+                    <li><a href="#">Drama</a></li>
+                    <li><a href="#">Sci-Fi</a></li>
+                    <li><a href="#">Horror</a></li>
+                </ul>
+            </div>
+
+            <div class="footer-subscribe">
+                <h4>Stay Updated</h4>
+                <p>Subscribe to our newsletter to receive updates on new movies and features.</p>
+                <div class="subscribe-form">
+                    <input type="email" class="subscribe-input" placeholder="Your email address">
+                    <button class="subscribe-btn">Subscribe</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-bottom">
+            <p>&copy; 2025 WEBZMOVIES. All rights reserved. | Designed with <i class="fas fa-heart" style="color: #f97316;"></i> for movie lovers</p>
+        </div>
+    </footer>
+    {% endblock %}
+
+    <script src="{% static 'js/script.js' %}"></script>
+</body>
+</html>

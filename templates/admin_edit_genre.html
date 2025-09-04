@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+<div class="admin-container">
+    <!-- Sidebar -->
+    {% include 'admin_sidebar.html' %}
+
+    <!-- Content -->
+    <div class="admin-content">
+        <div class="admin-header glass">
+            <h2>Edit Genre</h2>
+        </div>
+
+        <div class="glass" style="max-width:600px;margin:2rem auto;padding:2rem;border-radius:12px;">
+            <form method="post">
+                {% csrf_token %}
+                {{ form.as_p }}
+                <div style="margin-top:1rem; display:flex; gap:1rem;">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Save Changes
+                    </button>
+                    <a href="{% url 'movies:admin_genres' %}" class="btn btn-secondary">
+                        <i class="fas fa-times"></i> Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% block footer %}
+
+{% endblock %}
+
+<style>
+    form p {
+        margin-bottom: 1rem;
+    }
+
+    form label {
+        font-weight: 600;
+        margin-bottom: 0.3rem;
+        display: block;
+    }
+
+    form input[type="text"] {
+        width: 100%;
+        padding: 0.8rem;
+        border-radius: 8px;
+        border: 1px solid var(--glass-border);
+        background: rgba(255,255,255,0.05);
+        color: var(--text);
+    }
+
+    .btn {
+        padding: 0.7rem 1.2rem;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+        text-decoration: none;
+    }
+
+    .btn-primary {
+        background: var(--accent-gradient);
+        color: white;
+        border: none;
+    }
+
+    .btn-primary:hover {
+        opacity: 0.9;
+    }
+
+    .btn-secondary {
+        background: rgba(255,255,255,0.1);
+        border: 1px solid var(--glass-border);
+        color: var(--text);
+    }
+
+    .btn-secondary:hover {
+        background: rgba(255,255,255,0.2);
+    }
+</style>
+{% endblock %}

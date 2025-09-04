@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="admin-container">
+    <!-- Sidebar -->
+    {% include 'admin_sidebar.html' %}
+
+    <!-- Main Content -->
+    <div class="admin-content">
+        <div class="admin-header glass">
+            <h2>Add Genre</h2>
+            <a href="{% url 'movies:admin_genres' %}" class="btn btn-secondary">
+                <i class="fas fa-arrow-left"></i> Back to Genres
+            </a>
+        </div>
+
+        <div class="glass admin-form" style="max-width:600px; margin:auto; padding:2rem;">
+            <form method="post">
+                {% csrf_token %}
+                {{ form.non_field_errors }}
+                <div class="form-group">
+                    <label for="id_name">Genre Name</label>
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                        <div class="error">{{ form.name.errors }}</div>
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save"></i> Save Genre
+                </button>
+                <a href="{% url 'movies:admin_genres' %}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

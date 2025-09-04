@@ -1,0 +1,144 @@
+{% load static %}
+
+   <footer class="admin-footer">
+    <div class="admin-footer-content">
+        <div class="admin-footer-brand">
+            <h3><span>WEBZ</span>MOVIES</h3>
+            <p>The ultimate destination for movie enthusiasts to discover, review, and download their favorite films.</p>
+        </div>
+
+        <div class="admin-footer-links">
+            <h4>Quick Links</h4>
+            <ul>
+                <li><a href="{% url 'movies:home' %}">Home</a></li>
+                <li><a href="{% url 'movies:movie_list' %}">Movies</a></li>
+                <li><a href="#">New Releases</a></li>
+                <li><a href="#">Trending</a></li>
+                <li><a href="#">Support</a></li>
+            </ul>
+        </div>
+
+        <div class="admin-footer-links">
+            <h4>Genres</h4>
+            <ul>
+                <li><a href="#">Action</a></li>
+                <li><a href="#">Comedy</a></li>
+                <li><a href="#">Drama</a></li>
+                <li><a href="#">Sci-Fi</a></li>
+                <li><a href="#">Horror</a></li>
+            </ul>
+        </div>
+
+        <div class="admin-footer-subscribe">
+            <h4>Stay Updated</h4>
+            <p>Subscribe to our newsletter to receive updates on new movies and features.</p>
+            <div class="admin-subscribe-form">
+                <input type="email" class="admin-subscribe-input" placeholder="Your email address">
+                <button class="admin-subscribe-btn">Subscribe</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="admin-footer-bottom">
+        <p>&copy; 2025 WEBZMOVIES. All rights reserved. | Designed with
+           <i class="fas fa-heart" style="color: #f97316;"></i> for movie lovers
+        </p>
+    </div>
+</footer>
+
+<style>
+    /* Admin Footer */
+.admin-footer {
+    background: #0f172a;
+    color: #fff;
+    padding: 3rem 2rem 1rem;
+    margin-top: 3rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.admin-footer-content {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.admin-footer h3 span {
+    color: #f97316;
+    font-weight: 700;
+}
+
+.admin-footer-brand h3 {
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+}
+
+.admin-footer-links h4,
+.admin-footer-subscribe h4 {
+    font-size: 1.2rem;
+    margin-bottom: 0.8rem;
+    color: #f97316;
+}
+
+.admin-footer-links ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.admin-footer-links ul li {
+    margin-bottom: 0.5rem;
+}
+
+.admin-footer-links ul li a {
+    text-decoration: none;
+    color: #ccc;
+    transition: color 0.3s ease;
+}
+
+.admin-footer-links ul li a:hover {
+    color: #fff;
+}
+
+.admin-footer-subscribe p {
+    font-size: 0.95rem;
+    margin-bottom: 0.8rem;
+    color: #ccc;
+}
+
+.admin-subscribe-form {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.admin-subscribe-input {
+    flex: 1;
+    padding: 0.6rem 1rem;
+    border: none;
+    border-radius: 2rem;
+    outline: none;
+}
+
+.admin-subscribe-btn {
+    background: #f97316;
+    border: none;
+    padding: 0.6rem 1.2rem;
+    border-radius: 2rem;
+    color: #fff;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.admin-subscribe-btn:hover {
+    background: #ea580c;
+}
+
+.admin-footer-bottom {
+    text-align: center;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 1rem;
+    font-size: 0.9rem;
+    color: #aaa;
+}
+
+</style>

@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="admin-container">
+    {% include 'admin_sidebar.html' %}
+
+    <div class="admin-content">
+        <div class="admin-header glass">
+            <h2>Movies</h2>
+            <a href="{% url 'movies:admin_add_movie' %}" class="btn btn-primary">
+                <i class="fas fa-plus"></i> Add Movie
+            </a>
+        </div>
+
+        <!-- Filters -->
+        <div class="glass" style="padding:1rem; margin-bottom:1rem;">
+            <form method="get" class="filters" style="display:flex; gap:1rem; flex-wrap:wrap;">
+                <input class="input" type="text" name="q" value="{{ q }}" placeholder="Search title/synopsis"/>
+                <select class="select" name="genre">
+                    <option value="">All genres</option>
+                    {% for g in genres %}
+                        <option value="{{ g.id }}" {% if genre_id|default:'' == g.id|stringformat:'s' %}selected{% endif %}>
+                            {{ g.name }}
+                        </option>
+                    {% endfor %}
+                </select>
+                <button class="btn btn-secondary" type="submit">
+                    <i class="fas fa-search"></i> Apply
+                </button>
+            </form>
+        </div>
+
+        <!-- Movies Table -->
+        <div class="glass" style="overflow:auto;">
+            <table class="admin-table">
+                <thead>
+                    <tr>
+                        <th>Poster</th>
+                        <th>Title</th>
+                        <th>Genres</th>
+                        <th>Release</th>
+                        <th>Avg ★</th>
+                        <th style="width:180px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for m in page_obj.object_list %}
+                    <tr>
+                        <td>
+                            {% if m.poster %}
+                                <img src="{{ m.poster.url }}" alt="{{ m.title }}" style="height:60px;border-radius:6px;">
+                            {% endif %}
+                        </td>
+                        <td>{{ m.title }}</td>
+                        <td>{{ m.genre.all|join:", " }}</td>
+                        <td>{{ m.release_date }}</td>
+                        <td>{{ m.average_rating|default:"—" }}</td>
+                        <td>
+                            <a class="btn btn-small" href="{% url 'movies:admin_edit_movie' m.id %}">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            <form method="post" action="{% url 'movies:admin_movie_delete' m.id %}" style="display:inline;">
+                                {% csrf_token %}
+                                <button class="btn btn-small btn-danger" onclick="return confirm('Delete {{ m.title }}?');">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="6" style="text-align:center;">No movies found.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.paginator.num_pages > 1 %}
+        <div class="pagination">
+            {% if page_obj.has_previous %}
+                <a class="page" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if genre_id %}&genre={{ genre_id }}{% endif %}">« Prev</a>
+            {% endif %}
+            <span class="page current">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            {% if page_obj.has_next %}
+                <a class="page" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if genre_id %}&genre={{ genre_id }}{% endif %}">Next »</a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block footer %}
+
+{% endblock %}

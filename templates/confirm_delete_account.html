@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="auth-section">
+    <div class="auth-card glass">
+        <h1 class="auth-title">
+            <i class="fas fa-exclamation-triangle"></i> Confirm Account Deletion
+        </h1>
+        <p class="auth-subtitle">This action is permanent. Are you sure you want to delete your account?</p>
+
+        <form method="post">
+            {% csrf_token %}
+            <button type="submit" class="btn btn-danger">Yes, Delete My Account</button>
+        </form>
+
+        <a href="{% url 'movies:profile_settings' %}" class="btn btn-secondary">Cancel</a>
+    </div>
+</section>
+{% endblock %}

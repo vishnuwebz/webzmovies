@@ -1,0 +1,47 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+    <!-- Hero Section -->
+    <section class="hero" id="home">
+        <div class="hero-content">
+            <h1>Experience Cinema Like Never Before</h1>
+            <p>Discover, stream, and download your favorite movies in stunning quality. Join thousands of movie enthusiasts in our community.</p>
+            <div class="hero-buttons">
+                <a href="{% url 'movies:movie_list' %}" class="btn btn-explore">Explore Movies</a>
+                {% if not user.is_authenticated %}
+                <a href="{% url 'movies:signup' %}" class="btn btn-watch">Join Now</a>
+                {% endif %}
+            </div>
+        </div>
+        <div class="hero-bg"></div>
+    </section>
+
+    <!-- Movies Section -->
+    <section class="movies-section" id="movies">
+        <h2 class="section-title">Featured Movies</h2>
+
+        <div class="movies-grid">
+            {% for movie in movies %}
+            <div class="movie-card glass">
+                <img src="{{ movie.poster.url }}" alt="{{ movie.title }} Poster" class="movie-poster">
+                <div class="movie-info">
+                    <h3 class="movie-title">{{ movie.title }}</h3>
+                    <div class="movie-meta">
+                        <span>{{ movie.release_date.year }} • {{ movie.genre.all.0.name }}</span>
+                        <span class="movie-rating"><i class="fas fa-star"></i> {{ movie.average_rating|floatformat:1 }}</span>
+                    </div>
+                    <p class="movie-description">{{ movie.synopsis|truncatewords:20 }}</p>
+                    <div class="movie-actions">
+                        <a href="{{ movie.telegram_link }}" class="action-btn btn-download" target="_blank">Download</a>
+                        <button class="action-btn btn-wishlist" data-movie-id="{{ movie.id }}">
+                            <i class="far fa-bookmark"></i> Wishlist
+                        </button>
+                        <a href="{% url 'movies:movie_detail' movie.id %}" class="action-btn btn-review">Review</a>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+{% endblock %}

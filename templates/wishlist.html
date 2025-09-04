@@ -1,0 +1,152 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<section class="wishlist-section">
+    <div class="wishlist-header glass">
+        <h1><i class="fas fa-heart"></i> My Wishlist</h1>
+        <p>Your personal collection of movies you want to watch</p>
+        <div class="wishlist-stats">
+            <div class="stat">
+                <span class="stat-value">{{ wishlist_movies|length }}</span>
+                <span class="stat-label">Movies</span>
+            </div>
+        </div>
+    </div>
+
+    {% if wishlist_movies %}
+    <div class="wishlist-grid">
+        {% for movie in wishlist_movies %}
+        <div class="wishlist-item glass" data-movie-id="{{ movie.id }}">
+            <div class="wishlist-poster">
+                <img src="{{ movie.poster.url }}" alt="{{ movie.title }}">
+                <div class="wishlist-actions">
+                    <a href="{{ movie.telegram_link }}" class="btn-download" target="_blank">
+                        <i class="fas fa-download"></i> Download
+                    </a>
+                    <button class="btn-remove-wishlist" data-movie-id="{{ movie.id }}">
+                        <i class="fas fa-trash"></i> Remove
+                    </button>
+                </div>
+            </div>
+            <div class="wishlist-details">
+                <h3>{{ movie.title }}</h3>
+                <div class="movie-meta">
+                    <span>{{ movie.release_date.year }}</span>
+                    <span>•</span>
+                    {% for genre in movie.genre.all %}
+                    <span>{{ genre.name }}{% if not forloop.last %}, {% endif %}</span>
+                    {% endfor %}
+                    <span class="movie-rating"><i class="fas fa-star"></i> {{ movie.average_rating|floatformat:1 }}</span>
+                </div>
+                <p class="movie-description">{{ movie.synopsis|truncatewords:20 }}</p>
+                <div class="wishlist-item-actions">
+                    <a href="{% url 'movies:movie_detail' movie.id %}" class="btn-view-details">
+                        <i class="fas fa-info-circle"></i> Details
+                    </a>
+                    <a href="{{ movie.telegram_link }}" class="btn-download-small" target="_blank">
+                        <i class="fas fa-download"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-wishlist glass">
+        <div class="empty-icon">
+            <i class="fas fa-heart-broken"></i>
+        </div>
+        <h2>Your wishlist is empty</h2>
+        <p>Start adding movies you want to watch later</p>
+        <a href="{% url 'movies:movie_list' %}" class="btn btn-primary">
+            <i class="fas fa-film"></i> Browse Movies
+        </a>
+    </div>
+    {% endif %}
+</section>
+
+<!-- AJAX script for wishlist remove -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const removeButtons = document.querySelectorAll('.btn-remove-wishlist');
+
+        removeButtons.forEach(button => {
+            button.addEventListener('click', function() {
+                const movieId = this.getAttribute('data-movie-id');
+                const wishlistItem = this.closest('.wishlist-item');
+
+                fetch(`/remove_from_wishlist/${movieId}/`, {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCSRFToken(),
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        wishlistItem.style.opacity = '0';
+                        wishlistItem.style.transform = 'translateX(100px)';
+
+                        setTimeout(() => {
+                            wishlistItem.remove();
+                            if (document.querySelectorAll('.wishlist-item').length === 0) {
+                                location.reload();
+                            }
+                        }, 300);
+
+                        showToast(data.message, 'info');
+                    } else {
+                        showToast('Error: ' + data.message, 'error');
+                    }
+                })
+                .catch(() => {
+                    showToast('Error removing from wishlist.', 'error');
+                });
+            });
+        });
+
+        function getCSRFToken() {
+            let csrfToken = null;
+            const name = 'csrftoken';
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let cookie of cookies) {
+                    cookie = cookie.trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        csrfToken = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return csrfToken;
+        }
+
+        function showToast(message, type = 'info') {
+            const existing = document.querySelectorAll('.toast');
+            existing.forEach(toast => toast.remove());
+
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `
+                <div class="toast-message">${message}</div>
+                <button class="toast-close">&times;</button>
+            `;
+            document.body.appendChild(toast);
+
+            setTimeout(() => toast.classList.add('show'), 100);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+
+            toast.querySelector('.toast-close').addEventListener('click', () => {
+                toast.classList.remove('show');
+                setTimeout(() => toast.remove(), 300);
+            });
+        }
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,428 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="admin-container">
+    {% include 'admin_sidebar.html' %}
+
+    <div class="admin-content">
+        <div class="admin-header glass">
+            <h2>Review Management</h2>
+            <div class="admin-search">
+                <form method="GET" action="{% url 'movies:admin_reviews' %}">
+                    <input type="text" name="search" placeholder="Search reviews..." value="{{ search_query }}">
+                    <button type="submit" class="search-btn"><i class="fas fa-search"></i></button>
+                </form>
+                <div class="filter-group" style="margin-left: 1rem;">
+                    <select id="rating-filter" onchange="filterByRating(this.value)">
+                        <option value="">All Ratings</option>
+                        <option value="5">★★★★★</option>
+                        <option value="4">★★★★</option>
+                        <option value="3">★★★</option>
+                        <option value="2">★★</option>
+                        <option value="1">★</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div class="stats-grid" style="margin-bottom: 2rem;">
+            <div class="stat-card glass">
+                <div class="stat-icon">
+                    <i class="fas fa-star"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ reviews.paginator.count }}</h3>
+                    <p>Total Reviews</p>
+                </div>
+            </div>
+
+            <div class="stat-card glass">
+                <div class="stat-icon" style="background: rgba(234, 179, 8, 0.2);">
+                    <i class="fas fa-chart-line" style="color: #eab308;"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ average_rating|floatformat:1 }}</h3>
+                    <p>Average Rating</p>
+                </div>
+            </div>
+
+            <div class="stat-card glass">
+                <div class="stat-icon" style="background: rgba(34, 197, 94, 0.2);">
+                    <i class="fas fa-thumbs-up" style="color: #22c55e;"></i>
+                </div>
+                <div class="stat-content">
+                    <h3>{{ five_star_reviews }}</h3>
+                    <p>5-Star Reviews</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="table-container glass">
+            <table>
+                <thead>
+                    <tr>
+                        <th>User</th>
+                        <th>Movie</th>
+                        <th>Rating</th>
+                        <th>Comment</th>
+                        <th>Date</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for review in reviews %}
+                    <tr>
+                        <td>
+                            <div class="user-info">
+                                <div class="user-avatar">
+                                    {{ review.user.username|first|upper }}
+                                </div>
+                                <div class="user-details">
+                                    <strong>{{ review.user.username }}</strong>
+                                    <small>{{ review.user.email|default:"No email" }}</small>
+                                </div>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="movie-info">
+                                <strong>{{ review.movie.title }}</strong>
+                                <small>{{ review.movie.release_date.year }}</small>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="rating-display">
+                                <div class="stars">
+                                    {% for i in "12345" %}
+                                        {% if forloop.counter <= review.rating %}
+                                            <i class="fas fa-star"></i>
+                                        {% else %}
+                                            <i class="far fa-star"></i>
+                                        {% endif %}
+                                    {% endfor %}
+                                </div>
+                                <span class="rating-value">{{ review.rating }}/5</span>
+                            </div>
+                        </td>
+                        <td>
+                            <div class="comment-preview">
+                                {{ review.comment|truncatewords:10 }}
+                                {% if review.comment|wordcount > 10 %}
+                                <button class="view-comment-btn" data-comment="{{ review.comment }}">
+                                    View more
+                                </button>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>{{ review.created_at|date:"M d, Y" }}</td>
+                        <td class="action-cell">
+                            <a href="/admin/movies/review/{{ review.id }}/change/" class="action-btn btn-edit" target="_blank">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <a href="/admin/movies/review/{{ review.id }}/delete/" class="action-btn btn-delete" target="_blank">
+                                <i class="fas fa-trash"></i>
+                            </a>
+                            <button class="action-btn btn-view view-review-btn" data-review-id="{{ review.id }}">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="no-data">
+                            {% if search_query %}
+                            No reviews found matching "{{ search_query }}"
+                            {% else %}
+                            No reviews found.
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        {% if reviews.has_other_pages %}
+        <div class="pagination glass">
+            <span class="step-links">
+                {% if reviews.has_previous %}
+                    <a href="?page=1{% if search_query %}&search={{ search_query }}{% endif %}">&laquo; First</a>
+                    <a href="?page={{ reviews.previous_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">Previous</a>
+                {% endif %}
+
+                <span class="current">
+                    Page {{ reviews.number }} of {{ reviews.paginator.num_pages }}
+                </span>
+
+                {% if reviews.has_next %}
+                    <a href="?page={{ reviews.next_page_number }}{% if search_query %}&search={{ search_query }}{% endif %}">Next</a>
+                    <a href="?page={{ reviews.paginator.num_pages }}{% if search_query %}&search={{ search_query }}{% endif %}">Last &raquo;</a>
+                {% endif %}
+            </span>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Review Modal -->
+<div id="reviewModal" class="modal">
+    <div class="modal-content glass">
+        <span class="close">&times;</span>
+        <h3>Review Details</h3>
+        <div id="modal-body">
+            <!-- Content will be loaded here -->
+        </div>
+    </div>
+</div>
+
+<style>
+    .user-info, .movie-info {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+    }
+
+    .user-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: var(--accent-gradient);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: bold;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    .user-details, .movie-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .user-details small, .movie-info small {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+    }
+
+    .rating-display {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.3rem;
+    }
+
+    .stars {
+        color: #ffc107;
+        font-size: 0.9rem;
+    }
+
+    .rating-value {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    .comment-preview {
+        max-width: 200px;
+        line-height: 1.4;
+    }
+
+    .view-comment-btn {
+        background: none;
+        border: none;
+        color: var(--accent);
+        cursor: pointer;
+        font-size: 0.8rem;
+        padding: 0;
+        margin-top: 0.3rem;
+    }
+
+    .view-comment-btn:hover {
+        text-decoration: underline;
+    }
+
+    .action-cell {
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .action-btn {
+        padding: 0.5rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: var(--transition);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border: none;
+    }
+
+    .btn-edit {
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+    }
+
+    .btn-delete {
+        background: rgba(239, 68, 68, 0.2);
+        color: #ef4444;
+    }
+
+    .btn-view {
+        background: rgba(139, 92, 246, 0.2);
+        color: #8b5cf6;
+    }
+
+    .no-data {
+        text-align: center;
+        padding: 2rem;
+        color: var(--text-muted);
+    }
+
+    /* Modal Styles */
+    .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(5px);
+    }
+
+    .modal-content {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 2rem;
+        border-radius: 16px;
+        max-width: 600px;
+        width: 90%;
+        max-height: 80vh;
+        overflow-y: auto;
+    }
+
+    .close {
+        color: #aaa;
+        float: right;
+        font-size: 28px;
+        font-weight: bold;
+        cursor: pointer;
+        position: absolute;
+        right: 1rem;
+        top: 1rem;
+    }
+
+    .close:hover {
+        color: var(--text);
+    }
+
+    /* Filter Styles */
+    .filter-group select {
+        padding: 0.8rem;
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid var(--glass-border);
+        border-radius: 8px;
+        color: var(--text);
+        cursor: pointer;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .user-info, .movie-info {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 0.5rem;
+        }
+
+        .action-cell {
+            flex-direction: column;
+            gap: 0.3rem;
+        }
+
+        table {
+            font-size: 0.9rem;
+        }
+
+        th, td {
+            padding: 0.8rem;
+        }
+
+        .comment-preview {
+            max-width: 150px;
+        }
+
+        .modal-content {
+            width: 95%;
+            padding: 1.5rem;
+        }
+    }
+</style>
+
+<script>
+    // Filter by rating
+    function filterByRating(rating) {
+        const url = new URL(window.location.href);
+        if (rating) {
+            url.searchParams.set('rating', rating);
+        } else {
+            url.searchParams.delete('rating');
+        }
+        window.location.href = url.toString();
+    }
+
+    // View full comment
+    document.querySelectorAll('.view-comment-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const comment = this.getAttribute('data-comment');
+            alert('Full comment:\n\n' + comment);
+        });
+    });
+
+    // View review modal
+    document.querySelectorAll('.view-review-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            const reviewId = this.getAttribute('data-review-id');
+            // Here you would typically fetch review details via AJAX
+            // For now, we'll show a simple message
+            document.getElementById('modal-body').innerHTML = `
+                <p>Loading review details for ID: ${reviewId}</p>
+                <p>In a real implementation, this would fetch detailed review information via AJAX.</p>
+            `;
+            document.getElementById('reviewModal').style.display = 'block';
+        });
+    });
+
+    // Close modal
+    document.querySelector('.close').addEventListener('click', function() {
+        document.getElementById('reviewModal').style.display = 'none';
+    });
+
+    // Close modal when clicking outside
+    window.addEventListener('click', function(event) {
+        const modal = document.getElementById('reviewModal');
+        if (event.target === modal) {
+            modal.style.display = 'none';
+        }
+    });
+
+    // Set current rating filter
+    const urlParams = new URLSearchParams(window.location.search);
+    const ratingFilter = urlParams.get('rating');
+    if (ratingFilter) {
+        document.getElementById('rating-filter').value = ratingFilter;
+    }
+</script>
+{% endblock %}
+
+{% block footer %}
+
+{% endblock %}
