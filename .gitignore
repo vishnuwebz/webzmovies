@@ -1,9 +1,35 @@
-venv/
+# create .gitignore
+cat > .gitignore <<'EOF'
+# Python
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
-*.db
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+.eggs/
+dist/
+build/
+*.log
+
+# Virtualenv
+venv/
+ENV/
+env/
+.venv/
+
+# Django
 *.sqlite3
 media/
+staticfiles/
+*.key
+
+# IDEs
+.vscode/
+.idea/
+
+# secrets
 .env
+
+# mac
+.DS_Store
+EOF
