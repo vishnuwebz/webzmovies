@@ -10,6 +10,90 @@
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Montserrat:wght@700;800;900&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="{% static 'css/style.css' %}">
     <meta name="csrf-token" content="{{ csrf_token }}">
+    <style>
+        /* --- Navbar Styling --- */
+header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--accent);
+    text-decoration: none;
+}
+
+.nav-links {
+    display: flex;
+    list-style: none;
+    gap: 1.5rem;
+}
+
+.nav-links li a {
+    text-decoration: none;
+    font-weight: 500;
+    color: var(--text);
+    transition: color 0.2s ease;
+}
+
+.nav-links li a:hover {
+    color: var(--accent);
+}
+
+/* --- Hamburger --- */
+.hamburger {
+    display: none;
+    font-size: 1.8rem;
+    cursor: pointer;
+    color: var(--text);
+}
+
+/* --- Mobile Styles --- */
+@media (max-width: 992px) {
+    .nav-links {
+        position: fixed;
+        top: 0;
+        right: -100%;
+        height: 100vh;
+        width: 70%;
+        background: rgba(20, 20, 20, 0.95);
+        backdrop-filter: blur(10px);
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 2rem;
+        transition: right 0.3s ease-in-out;
+    }
+
+    .nav-links.active {
+        right: 0;
+    }
+
+    .hamburger {
+        display: block;
+    }
+}
+
+/* --- Tablet / TV adjustments --- */
+@media (min-width: 993px) and (max-width: 1440px) {
+    .nav-links {
+        gap: 1rem;
+    }
+}
+
+@media (min-width: 1441px) {
+    .nav-links {
+        gap: 2rem;
+    }
+}
+
+    </style>
 </head>
 <body>
     <!-- Header & Navigation -->
@@ -104,5 +188,26 @@
     {% endblock %}
 
     <script src="{% static 'js/script.js' %}"></script>
+    <script>
+        // --- Mobile Navbar Toggle ---
+document.addEventListener("DOMContentLoaded", () => {
+    const hamburger = document.querySelector(".hamburger");
+    const navLinks = document.querySelector(".nav-links");
+
+    if (hamburger && navLinks) {
+        hamburger.addEventListener("click", () => {
+            navLinks.classList.toggle("active");
+        });
+
+        // Close menu when clicking a link
+        navLinks.querySelectorAll("a").forEach(link => {
+            link.addEventListener("click", () => {
+                navLinks.classList.remove("active");
+            });
+        });
+    }
+});
+
+    </script>
 </body>
 </html>
