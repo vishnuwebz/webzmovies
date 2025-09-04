@@ -23,6 +23,7 @@ class Movie(models.Model):
     release_date = models.DateField()
     synopsis = models.TextField()
     poster = models.ImageField(upload_to='posters/')
+
     telegram_link = models.URLField()
     average_rating = models.FloatField(default=0)
     trailer_url = models.URLField(blank=True, null=True)  # NEW: Trailer addition - YouTube URL for the trailer
