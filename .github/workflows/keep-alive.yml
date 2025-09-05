@@ -3,7 +3,6 @@ name: Keep Render Alive
 on:
   schedule:
     - cron: '* * * * *'   # Runs every minute
-  workflow_dispatch:        # Allows manual triggering
 
 jobs:
   ping:
