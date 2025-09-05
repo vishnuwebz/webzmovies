@@ -108,16 +108,19 @@ WSGI_APPLICATION = "webzmovies.wsgi.application"
 # ---- Database configuration ----
 # Use DATABASE_URL in production (Render will provide DATABASE_URL if you add a Postgres service)
 DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL:
-    DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=True)}
-else:
-    # default local sqlite (development)
-    DATABASES = {
-        "default": {
-            "ENGINE": "django.db.backends.sqlite3",
-            "NAME": BASE_DIR / "db.sqlite3",
-        }
-    }
+# if DATABASE_URL:
+#     DATABASES = {"default": dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=True)}
+# else:
+#     # default local sqlite (development)
+#     DATABASES = {
+#         "default": {
+#             "ENGINE": "django.db.backends.sqlite3",
+#             "NAME": BASE_DIR / "db.sqlite3",
+#         }
+#     }
+DATABASES = {
+    'default': dj_database_url.config(default=os.environ.get('DATABASE_URL'))
+}
 
 # ---- Password validators ----
 AUTH_PASSWORD_VALIDATORS = [
